@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Disputes · Hold Guard{% endblock %}
+{% block body %}
+<h1>Disputes</h1>
+<p class="sub">When a buyer opens a case, Hold Guard gathers your proof and drafts a reply. You review it before anything is sent.</p>
+<form method="post" action="/disputes/sync"><p><button class="btn ghost small">Load disputes from PayPal</button></p></form>
+
+{% for d in disputes %}
+<div class="card">
+  <h2>{{ d.reason|replace('_', ' ')|capitalize }} · ${{ '%.2f'|format(d.amount or 0) }}</h2>
+  <p class="muted">Case {{ d.id }} · status {{ d.status }}
+    {% if d.sale %} · <a href="/sales/{{ d.sale.id }}">{{ d.sale.item_name }}</a>{% else %} · no matching sale found{% endif %}</p>
+  {% if d.buyer_note %}<p><b>Buyer said:</b> {{ d.buyer_note }}</p>{% endif %}
+
+  {% if d.submitted_at %}
+    <div class="alert ok">Evidence submitted {{ d.submitted_at[:16].replace('T', ' ') }}.</div>
+    <div class="ai">{{ d.ai_draft }}</div>
+  {% elif d.ai_draft %}
+    <form method="post" action="/disputes/{{ d.id }}/submit">
+      <label>Your reply (edit anything before sending)</label>
+      <textarea name="notes" rows="8">{{ d.ai_draft }}</textarea>
+      <p class="muted">The Evidence Pack PDF{% if d.sale and d.sale.tracking_number %} and tracking {{ d.sale.carrier }} {{ d.sale.tracking_number }}{% endif %} will be attached.</p>
+      <button class="btn">Approve and submit to PayPal</button>
+    </form>
+  {% else %}
+    <form method="post" action="/disputes/{{ d.id }}/draft"><button class="btn">Draft reply with AI</button></form>
+  {% endif %}
+  {% if d.submit_result and not d.submitted_at %}<p class="muted">Last attempt: {{ d.submit_result }}</p>{% endif %}
+</div>
+{% else %}
+<div class="card"><p class="muted">No disputes. To test: log in to the sandbox as the buyer at sandbox.paypal.com, open a payment, and report a problem ("item not received").</p></div>
+{% endfor %}
+{% endblock %}

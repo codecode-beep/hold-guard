@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Chat · Hold Guard{% endblock %}
+{% block body %}
+<h1>Chat</h1>
+<p class="sub">Send a photo of a shipping receipt, type "shipped USPS 9400…", or ask about a hold.</p>
+
+<div class="chat">
+  {% for m in history %}
+  <div class="bubble {{ m.role }}">{{ m.text }}
+    {% if m.proposal and m.proposal.type == 'tracking' %}
+    <form method="post" action="/sales/{{ m.proposal.sale_id }}/tracking" class="proposal">
+      <input type="hidden" name="chat_id" value="{{ m.id }}">
+      <select name="carrier" style="width:auto">{% for c in ['USPS','UPS','FEDEX','DHL','OTHER'] %}<option {{ 'selected' if c == m.proposal.carrier }}>{{ c }}</option>{% endfor %}</select>
+      <input name="tracking_number" value="{{ m.proposal.tracking_number }}" style="width:auto;flex:1">
+      <button class="btn small">Confirm and send</button>
+      <button class="btn ghost small" formaction="/chat/{{ m.id }}/dismiss">Cancel</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="muted">No messages yet.</p>
+  {% endfor %}
+</div>
+
+<form method="post" action="/chat" enctype="multipart/form-data" class="composer card">
+  <div class="row">
+    <div><input name="text" placeholder="Type a message…" autocomplete="off"></div>
+    <div style="flex:0 0 auto"><input type="file" name="photo" accept="image/*" style="width:auto"></div>
+    <button class="btn">Send</button>
+  </div>
+  <p class="muted">Nothing is sent to PayPal until you tap Confirm.</p>
+</form>
+<script>window.scrollTo(0, document.body.scrollHeight);</script>
+{% endblock %}

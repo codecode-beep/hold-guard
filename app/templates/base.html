@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Hold Guard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/">Hold<span>Guard</span></a>
+  <span class="muted hide-sm">{{ seller }} · PayPal sandbox</span>
+  <nav><a href="/">Sales</a><a href="/chat">Chat</a><a href="/disputes">Disputes</a></nav>
+</div></header>
+<main class="wrap">
+  {% if flash %}<div class="alert ok">{{ flash }}</div>{% endif %}
+  {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

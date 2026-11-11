@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ sale.item_name }} · Hold Guard{% endblock %}
+{% block body %}
+<p><a href="/">← All sales</a></p>
+<h1>{{ sale.item_name }}</h1>
+<p class="sub">${{ '%.2f'|format(sale.amount) }} · {{ sale.created_at[:16].replace('T', ' ') }} ·
+  {{ 'Service / digital' if sale.item_type == 'service' else 'Physical item' }} ·
+  <span class="pill {{ sale.risk_level or 'none' }}">{{ (sale.risk_level or 'n/a')|capitalize }} risk {{ sale.risk_score }}</span>
+  {% if sale.hold_status == 'released' %}<span class="pill low">Money released (sample)</span>{% endif %}</p>
+
+{% if sale.hold_status == 'held' %}
+<div class="alert err"><b>Payment on hold.</b> {{ sale.hold_note }}
+  <form method="post" action="/sales/{{ sale.id }}/release" class="inline"> <button class="btn ghost small">Simulate release</button></form></div>
+{% elif sale.hold_status == 'released' %}
+<div class="alert ok">{{ sale.hold_note }}</div>
+{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <h2>Why PayPal might hold this</h2>
+    {% for r in sale.risk_reasons %}
+      <div class="reason">{{ r.text }}<div class="do">What to do: {{ r.action }}</div></div>
+    {% else %}
+      <p class="muted">No hold signals found for this sale.</p>
+    {% endfor %}
+    {% if sale.category_reason %}<p class="muted">Item check: {{ sale.category|replace('_', ' ') }} — {{ sale.category_reason }}</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Checklist</h2>
+    <ul class="check">
+      {% for c in checklist %}<li class="{{ 'yes' if c.done else 'no' }}">{{ c.label }}</li>{% endfor %}
+    </ul>
+    <p><a class="btn ghost small" href="/sales/{{ sale.id }}/evidence.pdf" target="_blank">Download Evidence Pack (PDF)</a></p>
+  </div>
+</div>
+
+<div class="card">
+  {% if sale.item_type == 'service' %}
+    <h2>Mark the service completed</h2>
+    {% if sale.completed_at %}
+      <p>Completed on {{ sale.completed_at[:16].replace('T', ' ') }}. PayPal releases held money about 7 days after this.</p>
+    {% else %}
+      <p class="muted">Do this once the work is delivered. Hold Guard tells PayPal the order is fulfilled.</p>
+      <form method="post" action="/sales/{{ sale.id }}/complete"><button class="btn">Mark completed with PayPal</button></form>
+    {% endif %}
+  {% else %}
+    <h2>Tracking</h2>
+    {% if sale.tracking_sent_at %}
+      <p>Sent to PayPal: <b>{{ sale.carrier }} {{ sale.tracking_number }}</b> on {{ sale.tracking_sent_at[:16].replace('T', ' ') }}.</p>
+      {% if not sale.delivered %}
+      <form method="post" action="/sales/{{ sale.id }}/delivered"><button class="btn ghost small">Courier confirmed delivery (sandbox simulation)</button></form>
+      {% endif %}
+    {% else %}
+      <p class="muted">Tip: send a photo of the shipping receipt in <a href="/chat">Chat</a> and the AI fills this in.</p>
+      <form method="post" action="/sales/{{ sale.id }}/tracking" class="row">
+        <div><label>Carrier</label><select name="carrier">{% for c in carriers %}<option {{ 'selected' if c == 'USPS' }}>{{ c }}</option>{% endfor %}</select></div>
+        <div><label>Tracking number</label><input name="tracking_number" required></div>
+        <button class="btn">Send to PayPal</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Plain-language explanation</h2>
+    {% if sale.explanation %}<div class="ai">{{ sale.explanation }}</div>{% endif %}
+    <form method="post" action="/sales/{{ sale.id }}/explain"><p><button class="btn ghost small">{{ 'Refresh' if sale.explanation else 'Explain with AI' }}</button></p></form>
+  </div>
+  <div class="card">
+    <h2>Message to PayPal support</h2>
+    {% if sale.support_message %}<div class="ai">{{ sale.support_message }}</div>
+      <p class="muted">Copy this into PayPal's Message Center if your payment is still held.</p>{% endif %}
+    <form method="post" action="/sales/{{ sale.id }}/support-message"><p><button class="btn ghost small">{{ 'Redraft' if sale.support_message else 'Draft with AI' }}</button></p></form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Messages with the buyer</h2>
+  {% for m in messages %}
+    <p><b>{{ m.author|capitalize }}</b> <span class="muted">{{ m.created_at[:16].replace('T', ' ') }}</span><br>{{ m.text }}</p>
+  {% else %}<p class="muted">Paste important messages (like "got it, thanks!") so they're ready as proof.</p>{% endfor %}
+  <form method="post" action="/sales/{{ sale.id }}/messages" class="row">
+    <div style="flex:0 0 120px"><label>From</label><select name="author"><option value="buyer">Buyer</option><option value="seller">Me</option></select></div>
+    <div><label>Message</label><input name="text" required></div>
+    <button class="btn ghost">Save</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Alerts and demo tools</h2>
+  {% if sale.alert_sent_at %}<p>Alert emailed {{ sale.alert_sent_at[:16].replace('T', ' ') }}.</p>{% endif %}
+  {% if sale.alert_error %}<p class="muted">Last email error: {{ sale.alert_error }}</p>{% endif %}
+  <div class="row" style="align-items:center">
+    <form method="post" action="/sales/{{ sale.id }}/alert" class="inline"><button class="btn ghost small" {{ '' if alerts_on else 'disabled' }}>Email me this warning</button></form>
+    {% if not sale.hold_status %}
+    <form method="post" action="/sales/{{ sale.id }}/hold" class="inline"><button class="btn ghost small">Simulate PayPal hold (sample data)</button></form>
+    {% endif %}
+  </div>
+  <p class="muted">The PayPal sandbox can't create real holds, so holds shown here are labeled samples. Everything else on this page uses real sandbox data.</p>
+</div>
+
+<p class="muted">PayPal order {{ sale.order_id }} · capture {{ sale.capture_id }}</p>
+{% endblock %}

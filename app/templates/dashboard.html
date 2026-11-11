@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Your sales</h1>
+<p class="sub">Every PayPal sale, how likely PayPal is to hold it, and the next step to get paid.</p>
+
+<div class="stats">
+  <div class="stat"><b style="color:var(--high)">{{ counts.high }}</b><small>High risk</small></div>
+  <div class="stat"><b style="color:var(--med)">{{ counts.medium }}</b><small>Medium risk</small></div>
+  <div class="stat"><b style="color:var(--low)">{{ counts.low }}</b><small>Low risk</small></div>
+</div>
+
+{% if disputes %}
+<div class="alert err">{{ disputes|length }} open dispute{{ 's' if disputes|length > 1 }}. <a href="/disputes">Review and respond</a></div>
+{% endif %}
+
+<div class="card">
+  {% if sales %}
+  <table>
+    <tr><th>Sale</th><th>Amount</th><th>Hold risk</th><th class="hide-sm">Next step</th></tr>
+    {% for s in sales %}
+    <tr>
+      <td><a href="/sales/{{ s.id }}">{{ s.item_name }}</a><br>
+        <span class="muted">{{ s.created_at[:10] }} · {{ 'Service' if s.item_type == 'service' else 'Physical' }}</span></td>
+      <td>${{ '%.2f'|format(s.amount) }}</td>
+      <td>{% if s.hold_status == 'released' %}<span class="pill low">Released (sample)</span><br>
+          <span class="muted">was {{ s.risk_level }} risk {{ s.risk_score }}</span>
+        {% else %}<span class="pill {{ s.risk_level or 'none' }}">{{ (s.risk_level or 'n/a')|capitalize }} {{ s.risk_score or '' }}</span>
+          {% if s.hold_status == 'held' %}<br><span class="pill high">On hold (sample)</span>{% endif %}
+        {% endif %}
+        {% if s.alert_sent_at %}<br><span class="muted">Alert emailed</span>{% endif %}</td>
+      <td class="hide-sm">{{ s.next_step }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No sales yet. Create a sandbox test sale below.</p>
+  {% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Create a sandbox test sale</h2>
+    <p class="muted">Opens PayPal's sandbox checkout. Log in with your sandbox <b>buyer</b> account to pay with fake money.</p>
+    <form method="post" action="/sales/new">
+      <label>Item name</label><input name="item_name" required placeholder="iPhone 15 Pro 256GB">
+      <div class="row">
+        <div><label>Price (USD)</label><input name="amount" type="number" step="0.01" min="1" required value="45.00"></div>
+        <div><label>Type</label><select name="item_type"><option value="physical">Physical item</option><option value="service">Service / digital</option></select></div>
+      </div>
+      <p><button class="btn">Pay with PayPal sandbox</button></p>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Sync with PayPal</h2>
+    <p class="muted">Pull the last 31 days of sales (to learn what's normal for you) and any disputes.
+      New sales also arrive automatically through PayPal webhooks.</p>
+    <form method="post" action="/sync"><button class="btn ghost">Sync now</button></form>
+  </div>
+  <div class="card">
+    <h2>Demo data</h2>
+    <p class="muted">A new sandbox account has no past sales. Add about 2 months of small demo sales
+      so Hold Guard can learn your "normal" price. Demo rows are labeled and never sent to PayPal.</p>
+    {% if demo_count %}
+      <p>{{ demo_count }} demo past sales loaded.</p>
+      <form method="post" action="/demo/clear"><button class="btn ghost small">Remove demo history</button></form>
+    {% else %}
+      <form method="post" action="/demo/seed"><button class="btn ghost">Add demo history</button></form>
+    {% endif %}
+    <p class="muted">Email alerts for high-risk sales: {{ 'on' if alerts_on else 'off (add SMTP settings to .env)' }}</p>
+  </div>
+</div>
+{% endblock %}
