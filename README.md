@@ -10,7 +10,7 @@ PayPal sometimes holds a seller's money to protect buyers. PayPal publishes why 
 
 ## What Hold Guard does
 
-| Stage | Feature | PayPal API | AI (Claude) |
+| Stage | Feature | PayPal API | AI (Google Gemini) |
 |---|---|---|---|
 | Before | **Email alert** the moment a high-risk sale arrives, with the exact steps to take | Webhooks | — |
 | Before | **Hold Risk Check** scores each sale on PayPal's published hold reasons, compared with the seller's own history | Webhooks, Orders v2, Transaction Search | Reads free-text item names ("iPhone 15 Pro") to spot higher-risk categories |
@@ -40,7 +40,7 @@ Open http://localhost:8000
 ### Keys you need
 1. **PayPal sandbox app**: developer.paypal.com → Apps & Credentials → Sandbox → Create App. Copy Client ID and Secret.
 2. **Sandbox accounts**: developer.paypal.com → Testing Tools → Sandbox Accounts. Use the default *business* account as the seller (it owns the app) and the *personal* account as the buyer.
-3. **Claude**: console.anthropic.com → API keys.
+3. **Google Gemini key**: aistudio.google.com → Get API key (free tier). Put it in `GEMINI_API_KEY`.
 
 ## Deploy on Render
 
@@ -74,9 +74,23 @@ Demo history rows and sample holds are labeled in the app and are never sent to 
 - **Services have no tracking number.** Our first request included a carrier, and PayPal answered `TRACKING_NUMBER_IS_MISSING`. PayPal's docs show the no-tracking-number request must send only the transaction ID and a status.
 - **Two copies of uvicorn.** On machines with pyenv, `uvicorn` can start the system Python instead of the project's. Running `python -m uvicorn` always uses the project's environment.
 - **Disputes missing the seller's transaction ID**, solved with the amount-based fallback above.
+- **Disputes closing to the seller.** A sandbox "item not received" case moved to PayPal's own review within minutes, and PayPal answered `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE`. Hold Guard now shows each case's status in plain words, disables Submit once PayPal no longer accepts evidence, and turns every PayPal error into a plain-language message with the PayPal code kept as a small reference.
+- **AI answering in sentences instead of data.** The item and receipt readers need JSON, but the chatty assistant instructions made Gemini reply conversationally. We gave those two tasks their own short "data extractor" instructions and set Gemini's `responseMimeType` to `application/json`, which makes it return valid JSON only.
 
 ## AI tools used
-- **Claude** (Anthropic API, model set by `CLAUDE_MODEL`): item classification, receipt photo reading, hold explanations, dispute replies, support messages, chat.
+**Google Gemini** (`gemini-2.5-flash` through the Google AI Studio API; model set by `GEMINI_MODEL`).
+
+Gemini does six jobs:
+1. **Item reader:** classifies free-text item names into PayPal's risk categories (strict JSON output)
+2. **Receipt reader:** reads a shipping receipt photo or message and extracts carrier + tracking number (strict JSON output)
+3. **Hold explainer:** explains in plain words why a sale may be held and what to do
+4. **Support message:** drafts a message to PayPal support listing the proof provided
+5. **Dispute reply:** drafts the seller's response from real sale facts only
+6. **Chat:** answers seller questions about their sales
+
+The anti-fraud filter runs before Gemini is called, and Gemini's instructions repeat the rule.
+
+Note: Google's free tier may use requests to improve its products. Only sandbox test data is used in this demo; a production version would use a paid tier.
 
 ## Tests
 ```bash

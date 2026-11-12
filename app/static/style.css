@@ -41,6 +41,7 @@ tr:last-child td { border-bottom: 0; }
 .btn.ghost { background: transparent; color: var(--brand); }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .btn:hover { filter: brightness(1.08); text-decoration: none; }
+.btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
 form.inline { display: inline; }
 input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
   width: 100%; background: #fff; color: var(--ink); }

@@ -16,6 +16,53 @@ class PayPalError(Exception):
     def __init__(self, status: int, body: str, where: str):
         super().__init__(f"PayPal {where} failed ({status}): {body[:500]}")
         self.status, self.body, self.where = status, body, where
+        try:
+            data = json.loads(body)
+        except (ValueError, TypeError):
+            data = {}
+        data = data if isinstance(data, dict) else {}
+        self.debug_id = data.get("debug_id", "")
+        self.issues = [d.get("issue", "") for d in data.get("details") or [] if isinstance(d, dict)]
+        self.name = data.get("name") or data.get("error") or ""
+
+    def friendly(self) -> str:
+        """A plain-language message for the seller, with the technical code as a small reference."""
+        return friendly_message(self)
+
+
+# Plain-language messages for PayPal issue codes we have actually run into.
+_ISSUE_MESSAGES = {
+    "ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE":
+        "PayPal isn't accepting evidence for this case right now. The case has already moved to "
+        "PayPal's own review, so the seller can no longer add a response. Your drafted reply and "
+        "Evidence Pack are still saved here for your records.",
+    "TRACKING_NUMBER_IS_MISSING":
+        "PayPal needs a tracking number for this order. Check the carrier and tracking number and try again.",
+}
+
+
+def friendly_message(e: "PayPalError") -> str:
+    msg = next((_ISSUE_MESSAGES[i] for i in e.issues if i in _ISSUE_MESSAGES), None)
+    if not msg:
+        if e.status == 0:
+            msg = str(e).split(": ", 1)[-1]
+        elif e.status == 401 or e.name == "invalid_client":
+            msg = ("PayPal didn't accept this app's keys. Check PAYPAL_CLIENT_ID and "
+                   "PAYPAL_CLIENT_SECRET in .env (they must be the Sandbox keys).")
+        elif e.status == 403:
+            msg = ("This PayPal app isn't allowed to do that yet. In the PayPal developer dashboard, "
+                   "open the app and make sure the needed feature (for example Transaction search or "
+                   "Customer disputes) is turned on. New features can take a few hours to start working.")
+        elif e.status == 404:
+            msg = "PayPal couldn't find that order or case."
+        elif e.status == 422:
+            msg = "PayPal couldn't do this because of the order's or case's current state."
+        elif e.status >= 500:
+            msg = "PayPal is having a problem right now. Please try again in a few minutes."
+        else:
+            msg = f"PayPal couldn't complete this ({e.where})."
+    ref = ", ".join(x for x in [", ".join(e.issues) or e.name, f"reference {e.debug_id}" if e.debug_id else ""] if x)
+    return f"{msg} (PayPal: {ref})" if ref else msg
 
 
 def _access_token() -> str:

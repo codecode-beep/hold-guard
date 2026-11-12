@@ -69,7 +69,7 @@ def new_sale(item_name: str = Form(...), amount: float = Form(...), item_type: s
         order = paypal.create_order(item_name, amount, item_type)
         return RedirectResponse(paypal.approve_link(order), status_code=303)
     except paypal.PayPalError as e:
-        return back("/", err=str(e))
+        return back("/", err=e.friendly())
 
 
 @app.get("/paypal/return")
@@ -83,7 +83,7 @@ def paypal_return(token: str):
         sale_id = services.record_order(order)
         return back(f"/sales/{sale_id}", msg="Payment captured in the PayPal sandbox.")
     except paypal.PayPalError as e:
-        return back("/", err=str(e))
+        return back("/", err=e.friendly())
 
 
 @app.post("/sync")
@@ -93,7 +93,7 @@ def sync():
         d = services.sync_disputes()
         return back("/", msg=f"Imported {n} past sales and {d} disputes from PayPal.")
     except paypal.PayPalError as e:
-        return back("/", err=str(e))
+        return back("/", err=e.friendly())
 
 
 # ---------- Demo helpers (always labeled as demo in the UI) ----------
@@ -160,9 +160,9 @@ def send_tracking(sale_id: int, carrier: str = Form(...), tracking_number: str =
         paypal.add_tracking(sale["order_id"], sale["capture_id"], carrier, tracking_number)
     except paypal.PayPalError as e:
         if chat_id:
-            db.clear_proposal(chat_id, f"Could not send: {e}")
-            return back("/chat", err=str(e))
-        return back(f"/sales/{sale_id}", err=str(e))
+            db.clear_proposal(chat_id, f"Could not send: {e.friendly()}")
+            return back("/chat", err=e.friendly())
+        return back(f"/sales/{sale_id}", err=e.friendly())
     db.update_sale(sale_id, carrier=carrier, tracking_number=tracking_number, tracking_sent_at=db.now())
     if chat_id:
         db.clear_proposal(chat_id, f"Sent to PayPal: {carrier} {tracking_number} for sale #{sale_id}.")
@@ -176,7 +176,7 @@ def complete_service(sale_id: int):
     try:
         paypal.mark_service_completed(sale["capture_id"])
     except paypal.PayPalError as e:
-        return back(f"/sales/{sale_id}", err=str(e))
+        return back(f"/sales/{sale_id}", err=e.friendly())
     db.update_sale(sale_id, completed_at=db.now())
     return back(f"/sales/{sale_id}", msg="Order marked completed with PayPal.")
 
@@ -201,7 +201,7 @@ def explain(sale_id: int):
     try:
         db.update_sale(sale_id, explanation=ai.explain_hold(sale, services.sale_checklist(sale)))
     except Exception as e:
-        return back(f"/sales/{sale_id}", err=f"AI error: {e}")
+        return back(f"/sales/{sale_id}", err=ai.friendly_error(e))
     return back(f"/sales/{sale_id}")
 
 
@@ -211,7 +211,7 @@ def support_message(sale_id: int):
     try:
         db.update_sale(sale_id, support_message=ai.draft_support_message(sale, services.sale_checklist(sale)))
     except Exception as e:
-        return back(f"/sales/{sale_id}", err=f"AI error: {e}")
+        return back(f"/sales/{sale_id}", err=ai.friendly_error(e))
     return back(f"/sales/{sale_id}")
 
 
@@ -262,7 +262,8 @@ async def chat_send(text: str = Form(""), photo: UploadFile | None = File(None))
         db.add_chat("assistant", ai.chat_reply(text, services.sales_summary()))
     except Exception as e:
         log.exception("chat failed")
-        db.add_chat("assistant", f"Sorry, something went wrong ({e.__class__.__name__}). Please try again.")
+        msg = e.friendly() if isinstance(e, paypal.PayPalError) else ai.friendly_error(e)
+        db.add_chat("assistant", f"Sorry, I couldn't do that. {msg}")
     return back("/chat")
 
 
@@ -288,7 +289,7 @@ def disputes_sync():
         n = services.sync_disputes()
         return back("/disputes", msg=f"Loaded {n} disputes from PayPal.")
     except paypal.PayPalError as e:
-        return back("/disputes", err=str(e))
+        return back("/disputes", err=e.friendly())
 
 
 @app.post("/disputes/{dispute_id}/draft")
@@ -298,7 +299,7 @@ def dispute_draft(dispute_id: str):
     try:
         draft = ai.draft_dispute_reply(d, sale, db.messages_for(sale["id"]) if sale else [])
     except Exception as e:
-        return back("/disputes", err=f"AI error: {e}")
+        return back("/disputes", err=ai.friendly_error(e))
     db.update_dispute(dispute_id, ai_draft=draft)
     return back("/disputes")
 
@@ -313,8 +314,12 @@ def dispute_submit(dispute_id: str, notes: str = Form(...)):
         result = paypal.provide_evidence(dispute_id, notes, sale and sale.get("carrier"),
                                          sale and sale.get("tracking_number"), pdf)
     except paypal.PayPalError as e:
-        db.update_dispute(dispute_id, submit_result=str(e))
-        return back("/disputes", err=str(e))
+        db.update_dispute(dispute_id, ai_draft=notes, submit_result=e.friendly())  # keep the seller's edits
+        try:  # refresh the case status, so the page shows why PayPal said no
+            services.store_dispute(paypal.get_dispute(dispute_id))
+        except paypal.PayPalError:
+            pass
+        return back("/disputes", err=e.friendly())
     db.update_dispute(dispute_id, ai_draft=notes, submitted_at=db.now(), submit_result=json.dumps(result)[:500])
     return back("/disputes", msg="Evidence submitted to PayPal.")
 
