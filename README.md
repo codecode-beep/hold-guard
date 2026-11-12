@@ -25,8 +25,10 @@ PayPal sometimes holds a seller's money to protect buyers. PayPal publishes why 
 
 Needs Python 3.10+.
 
+**Live demo:** https://hold-guard.onrender.com (password-protected; the login is in the Devpost testing instructions)
+
 ```bash
-git clone https://github.com/<you>/hold-guard.git
+git clone https://github.com/codecode-beep/hold-guard.git
 cd hold-guard
 python3 -m venv .venv && source .venv/bin/activate
 python -m pip install -r requirements.txt
@@ -74,7 +76,8 @@ Demo history rows and sample holds are labeled in the app and are never sent to 
 - Hold Guard can't force PayPal to release money. It does the steps PayPal says help, sooner.
 - The risk score uses PayPal's **public** hold reasons; PayPal's internal systems use more signals.
 - PayPal's REST API has no direct "mark order Completed" call like the seller website. For services, Hold Guard uses the Add Tracking API's documented "without tracking number" option, the closest API equivalent. Whether PayPal's hold system treats both identically can only be confirmed on a live account.
-- Some sandbox dispute records list only the buyer's transaction ID, so Hold Guard falls back to matching a dispute to the most recent sale with the same amount.
+- Some sandbox dispute records list only the buyer's transaction ID, so Hold Guard falls back to matching a dispute to the most recent sale with the same amount. Two sales with the same amount can therefore be mixed up.
+- Each running copy of the app keeps its own SQLite file. On Render's free plan that file resets on every restart, and a dispute for a sale made in another copy shows "no matching sale found". A production version would use a hosted database.
 - In the sandbox, an "item not received" dispute can move straight to PayPal review within minutes, which may limit when evidence can be submitted.
 
 ## Challenges we hit
