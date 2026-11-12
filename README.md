@@ -62,6 +62,13 @@ Note: Render's free plan resets the SQLite file on each deploy. Use **Sync now**
 
 Demo history rows and sample holds are labeled in the app and are never sent to PayPal.
 
+## Security
+- **Demo password:** when `APP_PASSWORD` is set (as on the hosted demo), the browser asks for a username and password before showing any page. Login details for judges are in the Devpost testing instructions. On your own computer, leave it empty.
+- **PayPal webhook** stays open (PayPal can't type a password) and is protected instead by verifying PayPal's signature on every message.
+- **Secrets** (PayPal, Gemini, email) live only in environment variables, never in the code or pages.
+- **Every action sent to PayPal needs a seller click,** and an anti-fraud filter blocks requests to get around PayPal's checks.
+- **One seller per deployment:** the demo acts as the sandbox business account that owns the PayPal app keys. A production version would let each seller connect their own PayPal account through PayPal's partner onboarding.
+
 ## Honest limits
 - The sandbox can't create real payment holds or real courier deliveries. Delivery confirmation is a labeled simulation button; holds in the video use labeled sample data. Every PayPal call (orders, tracking, transaction search, disputes, webhooks) is real sandbox traffic.
 - Hold Guard can't force PayPal to release money. It does the steps PayPal says help, sooner.

@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import ai, alerts, config, db, demo, evidence, paypal, services
+from . import ai, alerts, config, db, demo, evidence, paypal, security, services
 from .safety import REFUSAL, is_evasion_request
 
 log = logging.getLogger("holdguard")
@@ -23,6 +23,17 @@ templates = Jinja2Templates(directory=BASE / "templates")
 @app.on_event("startup")
 def startup():
     db.init()
+    if security.is_enabled():
+        log.info("Password protection is ON for user %r", config.APP_USERNAME)
+
+
+@app.middleware("http")
+async def require_password(request: Request, call_next):
+    """Runs before every page. Asks the browser for the demo password when APP_PASSWORD is set."""
+    if security.allowed(request.url.path, request.headers.get("authorization")):
+        return await call_next(request)
+    return Response("Password required for this Hold Guard demo.", status_code=401,
+                    headers={"WWW-Authenticate": 'Basic realm="Hold Guard demo", charset="UTF-8"'})
 
 
 def page(request: Request, name: str, **ctx):

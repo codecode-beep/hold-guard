@@ -19,6 +19,10 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "holdguard.db")
 SELLER_NAME = os.getenv("SELLER_NAME", "Demo Seller")
 
+# Password for the hosted demo. Empty = no password (fine on your own computer).
+APP_USERNAME = os.getenv("APP_USERNAME", "judge")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+
 # Optional email alerts for high-risk sales (Gmail: smtp.gmail.com, port 587, an app password)
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
