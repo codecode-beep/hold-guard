@@ -23,7 +23,7 @@ PayPal sometimes holds a seller's money to protect buyers. PayPal publishes why 
 
 ## Run it locally
 
-Needs Python 3.11+.
+Needs Python 3.10+.
 
 ```bash
 git clone https://github.com/<you>/hold-guard.git
